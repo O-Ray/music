@@ -1,0 +1,199 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+</head>
+<body>
+  <video src="miku.mp3" style="display:none;"></video>
+  <style media="screen">
+    body{
+      margin: 0;
+      background: black;
+    }
+    #canvas1{
+      width: 120%;
+      height: 100%;
+      position: absolute;
+      top: -30vh;
+      left: 0px;
+    }
+    button{
+      position: absolute;
+      top: 0px;
+      left: 0px;
+      z-index: 100;
+    }
+    .body{
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0px;
+      left: 0px;
+      overflow: hidden;
+    }
+  </style>
+  <div class="body">
+    <p class='title'>DAWN</p>
+    <p>
+    <button onclick="play();">再生</button>
+    <!-- <button onclick="stop();">停止</button> -->
+    </p>
+    <canvas id="canvas1"></canvas>
+    <canvas id="canvas2" width="256" height="255" style="border:1px solid #ccc; display: none;"></canvas>
+
+    <script>
+      let rgbCode = '';
+      colorCode();
+      function colorCode(){
+        const color = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
+        let a1 = color[Math.floor(Math.random() * 16)];
+        let a2 = color[Math.floor(Math.random() * 16)];
+        let a3 = color[Math.floor(Math.random() * 16)];
+        let a4 = color[Math.floor(Math.random() * 16)];
+        let a5 = color[Math.floor(Math.random() * 16)];
+        let a6 = color[Math.floor(Math.random() * 16)];
+        rgbCode = '#' + a1 + a2 + a3 + a4 + a5 + a6;
+        setTimeout(colorCode, 300);
+      }
+      function hslToRgb(h, s, l){
+    var r, g, b;
+
+    if(s == 0){
+        r = g = b = l; // achromatic
+    }else{
+        var hue2rgb = function hue2rgb(p, q, t){
+            if(t < 0) t += 1;
+            if(t > 1) t -= 1;
+            if(t < 1/6) return p + (q - p) * 6 * t;
+            if(t < 1/2) return q;
+            if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        }
+
+        var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        var p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+    }
+
+    return [Math.round(r), Math.round(g), Math.round(b)];
+}
+      var canvas1 = document.getElementById('canvas1');
+      var canvas2 = document.getElementById('canvas2');
+      var ctx1 = canvas1.getContext('2d') ;
+      var ctx2 = canvas2.getContext('2d') ;
+
+      ctx1.clearRect(0, 0, canvas1.width, canvas1.height);
+      ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
+
+      ctx1.lineWidth = ctx2.lineWidth =  1;
+      ctx1.strokeStyle = ctx2.strokeStyle = rgbCode;
+
+
+      var audioCtx;
+      var audioSourceNode;
+      var analyserNode;
+      var data1,data2;
+
+      var audioEle;
+
+      var firstflg = true;
+
+      function play(){
+
+        try{
+          if(firstflg){
+            // AudioContextの生成
+            audioCtx =  new AudioContext();
+            firstflg = false;
+          }
+
+          if(audioEle){
+            audioEle.pause();
+          }
+
+          audioEle = new Audio();
+
+          audioEle.src = 'miku.mp3';
+          // if (document.getElementById("m2").checked) audioEle.src = 'waveform_spectrum_sine.mp3';
+          // if (document.getElementById("m3").checked) audioEle.src = 'waveform_spectrum_triangle.mp3';
+          // if (document.getElementById("m4").checked) audioEle.src = 'waveform_spectrum_square.mp3';
+          // if (document.getElementById("m5").checked) audioEle.src = 'waveform_spectrum_sawtooth.mp3';
+
+          audioEle.autoplay = true;
+          audioEle.preload = 'auto';
+
+          // MediaElementAudioSourceNodeの生成
+          if(audioSourceNode){
+            audioSourceNode.disconnect();
+          }
+          audioSourceNode = audioCtx.createMediaElementSource(audioEle);
+
+          // AnalyserNodeの生成
+          // ※音声の時間と周波数を解析する
+          if(analyserNode){
+            analyserNode.disconnect();
+          }
+          analyserNode = audioCtx.createAnalyser();
+
+          // FFT(高速フーリエ変換)においての周波数領域
+          analyserNode.fftSize = 256;
+
+          data1 = new Uint8Array(analyserNode.fftSize * 2);
+          data2 = new Uint8Array(analyserNode.fftSize / 4);
+
+          // オーディオノードの設定
+          audioSourceNode.connect(analyserNode);
+          analyserNode.connect(audioCtx.destination);
+
+          draw();
+        }catch(e){
+          alert(e);
+        }
+      }
+
+      function draw() {
+        requestAnimationFrame(draw);
+
+        // TimeDomain(波形データ)
+        analyserNode.getByteTimeDomainData(data1);
+        ctx1.fillRect(0, 0, canvas1.width, canvas1.height);
+        console.log(rgbCode);
+        // alert(hsl);
+
+        ctx1.strokeStyle = rgbCode;
+        ctx1.beginPath();
+        ctx1.moveTo(0, data1[0]);
+        for(var i = 0; i < data1.length; i++) {
+          ctx1.lineTo(i, data1[i]);
+        }
+        ctx1.stroke();
+
+        ctx1.strokeStyle = 'rgb(0, 0, 0)';
+        ctx1.beginPath();
+          ctx1.moveTo(0, 300);
+          ctx1.lineTo(256, 127);
+        ctx1.stroke();
+
+        // Frequency(周波数スペクトル)
+        analyserNode.getByteFrequencyData(data2);
+        ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
+
+        // 周波数を簡易的に表示する
+        ctx2.beginPath();
+        ctx2.moveTo(0,  255 - data2[0]);
+        for(var i = 0; i < data2.length; i++) {
+           ctx2.lineTo(i*4, 255 - data2[i]);
+        }
+        ctx2.stroke();
+      };
+
+      function stop(){
+        audioEle.pause();
+      }
+
+    </script>
+  </div>
+</body>
+</html>
